@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Konten</title>
+<meta name="theme-color" content="#4FAE87">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- style.css = salinan style.css app Absensi (hrKulturama/ABSENSI). web.css = tambahan khusus web app ini. -->
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="web.css">
+</head>
+<body class="web-dashboard">
+
+<!-- ===== LOGIN (nama + PIN Absensi) — logika di auth.js ===== -->
+<div class="app-gate" id="appGate">
+  <div class="app-gate-inner">
+    <div class="app-gate-brand">
+      <span class="emoji">📊</span>
+      <div class="title">Dashboard Konten</div>
+    </div>
+    <form class="card" id="loginForm" novalidate>
+      <p class="info-text" id="loginInfo">Masuk pakai nama & PIN Absensi kamu. Khusus tim Kreatif, HR, dan admin.</p>
+      <label class="web-label" for="loginNama">Nama</label>
+      <select id="loginNama" required><option value="">Memuat daftar nama…</option></select>
+      <input type="text" id="loginNamaText" placeholder="Tulis nama persis seperti di Absensi" autocomplete="username" hidden>
+      <label class="web-label" for="loginPin">PIN</label>
+      <input type="password" id="loginPin" placeholder="PIN 4 digit" inputmode="numeric" maxlength="4" autocomplete="current-password" required>
+      <div id="loginError" role="alert"></div>
+      <button class="btn" type="submit" id="loginBtn">Masuk</button>
+    </form>
+  </div>
+</div>
+
+<div class="app-shell">
+  <div class="web-userbar" id="userBar" hidden>
+    <span>Masuk sebagai <b id="userName">—</b></span>
+    <button type="button" class="web-logout" id="logoutBtn">Keluar</button>
+  </div>
+
+<div class="page active" id="page-dashboard">
+  <div style="padding:0">
+    <div class="home-header">
+      <div>
+        <div class="home-eyebrow">Kontrol Upload</div>
+        <div class="home-title">Dashboard Konten</div>
+      </div>
+      <button type="button" class="badge-circle dash-refresh" id="dashRefresh" title="Tarik data terbaru" aria-label="Tarik data terbaru">↻</button>
+    </div>
+    <div class="home-sub" id="dashSync">Memuat…</div>
+
+    <div class="section-label">Tanggal</div>
+    <div class="scroll-x dash-week" id="dashWeek"></div>
+
+    <div class="dash-filters">
+      <div class="dash-chips" id="dashJenis" role="group" aria-label="Jenis konten"></div>
+      <div class="dash-chips" id="dashAkun" role="group" aria-label="Akun"></div>
+    </div>
+
+    <div class="dash-summary" id="dashSummary"></div>
+
+    <div class="dash-listhead">
+      <div class="section-label" id="dashListTitle">Konten</div>
+      <label class="dash-toggle" for="dashOnlyProblem"><input type="checkbox" id="dashOnlyProblem"> Belum beres aja</label>
+    </div>
+    <div id="dashRows"></div>
+  </div>
+</div>
+
+
+  <div class="dash-toast" id="dashToast" role="status" style="display:none"></div>
+</div>
+
+<script src="dashboard.js"></script>
+<script src="auth.js"></script>
+</body>
+</html>

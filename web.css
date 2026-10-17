@@ -1,0 +1,22 @@
+/* Tambahan khusus web app Dashboard (di atas style.css salinan app Absensi). */
+
+/* Gak ada bottom nav di sini, jadi ruang bawah yang disiapin buat nav gak perlu segede itu. */
+body.web-dashboard { padding-bottom: 28px; }
+body.web-dashboard .dash-toast { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+
+/* Bar kecil di atas: siapa yang login + tombol keluar */
+.web-userbar {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 14px 16px 0; font-size: 12px; font-weight: 600; color: var(--ink-soft);
+}
+.web-userbar b { color: var(--ink); font-weight: 800; }
+.web-logout {
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--ink);
+  border-radius: 999px; padding: 6px 12px; font: 700 12px var(--font-body); cursor: pointer;
+}
+.web-logout:focus-visible { outline: 2px solid var(--mint-deep); outline-offset: 2px; }
+#page-dashboard { padding-top: 18px; }
+
+/* Form login */
+.web-label { display: block; font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 4px; }
+#loginForm .info-text { margin-bottom: 14px; }
