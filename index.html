@@ -4,15 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Dashboard Konten</title>
-<meta name="theme-color" content="#4FAE87">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#191919" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<!-- style.css = tema pastel "Shoebox Tag" (asal dari app Absensi). web.css = tambahan khusus web app ini. -->
-<link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="web.css">
+<!-- Tema minimalis ala Notion (terang + gelap otomatis), semua ukuran layar. -->
+<link rel="stylesheet" href="app.css">
 </head>
 <body class="web-dashboard">
 
@@ -45,6 +42,9 @@
     <div class="dash-listhead">
       <div class="section-label" id="dashListTitle">Konten</div>
       <label class="dash-toggle" for="dashOnlyProblem"><input type="checkbox" id="dashOnlyProblem"> Belum beres aja</label>
+    </div>
+    <div class="dash-table-head" aria-hidden="true">
+      <span>Konten</span><span>Akun · Jenis</span><span>Tim</span><span>YouTube</span><span>Instagram</span><span>TikTok</span><span>Status</span>
     </div>
     <div id="dashRows"></div>
    </main>

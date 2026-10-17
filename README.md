@@ -16,8 +16,7 @@ kolom PRODUCTION, plus detail & edit tiap konten.
 |---|---|
 | `index.html` | Halaman dashboard + `DASHBOARD_CONFIG.apiUrl` (alamat backend) |
 | `dashboard.js` | Logika dashboard (list, ringkasan, detail, edit) |
-| `style.css` | Tema pastel "Shoebox Tag" (asal dari app Absensi) |
-| `web.css` | Tambahan khusus web app ini |
+| `app.css` | Tema minimalis ala Notion (terang/gelap otomatis) untuk HP, tablet, dan desktop |
 | `apps-script/dashboard-backend.gs` | Kode backend Apps Script (project sendiri) |
 
 ## Pasang backend
