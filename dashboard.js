@@ -1,19 +1,18 @@
 // =====================================================================
-// DASHBOARD KONTEN (Kontrol Upload) — tab "Dashboard" di app Absensi.
+// DASHBOARD KONTEN — web app mandiri (oqaja/DASHBOARD).
 //
-// Baca & ubah STATUS YT/IG/TT di tab KALENDER KONTEN (DASHBOARD KULTURAMA
-// V1) lewat project Apps Script standalone "Kontrol Upload"
-// (kode: apps-script/kontrol-upload.gs). Bukan bagian dari backend Absensi.
+// Asalnya salinan tab "Dashboard" di app Absensi, sekarang berdiri sendiri:
+// TANPA login dan TANPA nyambung ke backend Absensi. Yang dipakai bareng cuma
+// datanya: tab KALENDER KONTEN (DASHBOARD KULTURAMA V1), lewat backend Apps
+// Script sendiri (apps-script/dashboard-backend.gs). Alamat backend diatur di
+// window.DASHBOARD_CONFIG.apiUrl (index.html).
 //
-// Auth: token login Absensi (localStorage 'absensi_token'), diverifikasi
-// backend pakai HR_TOKEN_SECRET yang sama. Cuma role kreatif / hr / admin;
-// nav "Dashboard" disembunyiin buat role lain.
-//
-// Semua isi file ini dibungkus IIFE biar gak nabrak variabel global app.js.
-// Yang diekspor cuma window.renderDashboard & window.updateDashboardNav.
+// Semua isi file ini dibungkus IIFE. Yang diekspor cuma window.renderDashboard
+// & window.updateDashboardNav.
 // =====================================================================
 (() => {
-  const KONTROL_API_URL = 'https://script.google.com/macros/s/AKfycbzzt7PwgGJXz00j8j23CsJl0RPM6OAaRqsP2EcC2h-V-NigT0jhh51RlnnJikbS-iCWaQ/exec';
+  const CONFIG = window.DASHBOARD_CONFIG || {};
+  const KONTROL_API_URL = String(CONFIG.apiUrl || '').trim();
   const ROLE_BOLEH = ['kreatif', 'hr', 'admin'];
 
   const STATUS_OPTS = ['Acc', 'Scheduled', 'Uploaded', 'Gagal'];
@@ -42,8 +41,9 @@
   } catch (e) {}
   function savePrefs() { lsSet('dashboard_prefs', JSON.stringify({ jenis: state.jenis, akun: state.akun, onlyProblem: state.onlyProblem })); }
 
-  const tokenNow = () => lsGet('absensi_token') || '';
-  const roleNow = () => String(lsGet('absensi_role') || '').toLowerCase();
+  // Tanpa login: backend gak minta token, semua yang buka web app boleh lihat & edit.
+  const tokenNow = () => 'public';
+  const roleNow = () => 'kreatif';
   const isPageActive = () => { const p = $('page-dashboard'); return !!(p && p.classList.contains('active')); };
 
   // ---------- tanggal (selalu WIB) ----------
@@ -290,6 +290,7 @@
   // ---------- backend ----------
   function ApiError(code, message) { const e = new Error(message); e.code = code; return e; }
   async function api(method, params) {
+    if (!KONTROL_API_URL) throw ApiError('SETUP', 'Alamat backend belum diisi. Isi apiUrl di DASHBOARD_CONFIG (index.html) dengan URL Web App Apps Script.');
     let res;
     try {
       if (method === 'GET') {

@@ -1,31 +1,25 @@
 /**
- * KONTROL UPLOAD — backend Apps Script untuk tab Dashboard app Absensi (dashboard.js)
+ * DASHBOARD KONTEN — backend Apps Script untuk web app oqaja/DASHBOARD
  * ---------------------------------------------------------------
- * Project Apps Script TERPISAH (standalone). Bukan bagian dari
- * Code.js Absensi dan bukan project Report Kreatif.
+ * Project Apps Script SENDIRI (standalone), terpisah dari app Absensi dan
+ * dari project "Kontrol Dashboard" milik app Absensi. Yang dipakai bareng
+ * cuma datanya: tab KALENDER KONTEN di DASHBOARD KULTURAMA V1.
  *
- * Baca tab KALENDER KONTEN (DASHBOARD KULTURAMA V1), ubah STATUS
- * YT/IG/TT, dan edit isi satu baris konten (tab Dashboard app Absensi).
- *
- * Auth: pakai TOKEN LOGIN ABSENSI yang sama (localStorage
- * 'absensi_token'), diverifikasi persis seperti project
- * "Kreatif-Produksi Report Backend": HMAC-SHA256 pakai
- * HR_TOKEN_SECRET. Yang boleh akses: role kreatif, hr, admin.
+ * TANPA LOGIN: siapa pun yang tahu URL web app ini bisa baca & edit isi
+ * KALENDER KONTEN lewat dashboard. Pengaman yang tetap ada:
+ *  - cuma kolom di FIELDS yang bisa diubah (EVENT ID read-only),
+ *  - gak bisa hapus/nambah baris,
+ *  - tiap simpan dicek dulu barisnya masih konten yang sama (judul+tanggal).
  *
  * Cara pasang:
- * 1. script.google.com → New project → tempel file ini.
- * 2. Project Settings → Script Properties → tambah:
- *      HR_TOKEN_SECRET = <HARUS SAMA PERSIS dengan di project
- *                         Absensi / Kreatif-Produksi Report Backend>
- * 3. Deploy → New deployment → Web app
+ * 1. script.google.com → New project → tempel file ini → Save.
+ *    (Pakai akun Google yang bisa EDIT spreadsheet DASHBOARD KULTURAMA V1.)
+ * 2. Deploy → New deployment → Web app
  *      Execute as: Me
  *      Who has access: Anyone
- * 4. Copy URL /exec → tempel ke KONTROL_API_URL di dashboard.js.
- *    Update kode: Deploy → Manage deployments → ✏️ → Version: New version
- *    (URL tetap sama, gak perlu ganti di dashboard.js).
- * 5. Tes: jalankan testVerifikasiToken() dari editor (lihat bawah).
- *
- * Kalau HR_TOKEN_SECRET suatu saat diganti, ganti juga di sini.
+ * 3. Copy URL /exec → tempel ke apiUrl di DASHBOARD_CONFIG (index.html).
+ *    Update kode: Save → Deploy → Manage deployments → ✏️ → Version: New version
+ *    (URL tetap sama).
  */
 
 const SPREADSHEET_ID = '1raiIO1HccW7IxN9bh9BqUJ7DOHDVBN05GKRQ5xrrfeI';
@@ -33,7 +27,6 @@ const TAB = 'KALENDER KONTEN';
 const TZ = 'Asia/Jakarta';
 const STATUS_OPTS = ['', 'Acc', 'Scheduled', 'Uploaded', 'Gagal'];
 const MAX_RANGE_DAYS = 62;
-const ALLOWED_ROLES = ['kreatif', 'hr', 'admin'];
 
 // Kolom dicari lewat NAMA HEADER di baris 1, bukan posisi — jadi kolom boleh
 // ditambah/dihapus/dipindah di sheet tanpa bikin app salah baca.
@@ -57,7 +50,6 @@ const MULTI_KEYS = ['segmen', 'brand'];
 function doGet(e) {
   return handle_(function () {
     const p = (e && e.parameter) || {};
-    cekAkses_(p.token);
     if (p.action === 'list') return list_(p.from, p.to);
     if (p.action === 'ping') return { ok: true };
     throw err_('BAD_REQUEST', 'action tidak dikenal');
@@ -69,7 +61,6 @@ function doPost(e) {
     let body;
     try { body = JSON.parse((e && e.postData && e.postData.contents) || '{}'); }
     catch (x) { throw err_('BAD_REQUEST', 'Body bukan JSON'); }
-    cekAkses_(body.token);
     if (body.action === 'setStatus') return setStatus_(body);
     if (body.action === 'updateRow') return updateRow_(body);
     throw err_('BAD_REQUEST', 'action tidak dikenal');
@@ -225,34 +216,6 @@ function sheet_() {
   return sh;
 }
 
-// ---------- auth (sama persis dengan Kreatif-Produksi Report Backend) ----------
-function signPayload_(payloadB64) {
-  const secret = PropertiesService.getScriptProperties().getProperty('HR_TOKEN_SECRET');
-  if (!secret) throw err_('SETUP', 'HR_TOKEN_SECRET belum diisi di Script Properties');
-  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(payloadB64, secret));
-}
-
-// Return { nama, role, exp } kalau token sah, atau null.
-function readToken_(token) {
-  if (!token) return null;
-  const parts = String(token).split('.');
-  if (parts.length !== 2) return null;
-  if (signPayload_(parts[0]) !== parts[1]) return null;
-  try {
-    const payload = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString());
-    if (!payload.exp || Date.now() > payload.exp) return null;
-    return payload;
-  } catch (e) { return null; }
-}
-
-function cekAkses_(token) {
-  const payload = readToken_(token);
-  if (!payload) throw err_('UNAUTHORIZED', 'Sesi habis atau belum login. Masuk lagi lewat app Absensi.');
-  const role = String(payload.role || '').toLowerCase();
-  if (ALLOWED_ROLES.indexOf(role) === -1) throw err_('FORBIDDEN', 'Role kamu tidak punya akses ke Kontrol Upload.');
-  return payload;
-}
-
 const MON_ = { jan:1, feb:2, mar:3, apr:4, may:5, mei:5, jun:6, jul:7, aug:8, agu:8, agt:8, sep:9, oct:10, okt:10, nov:11, dec:12, des:12 };
 function cellDate_(v, disp) {
   if (v instanceof Date && !isNaN(v)) return Utilities.formatDate(v, TZ, 'yyyy-MM-dd');
@@ -288,15 +251,4 @@ function handle_(fn) {
   try { out = fn(); }
   catch (e) { out = { ok: false, code: e.code || 'SERVER_ERROR', message: String(e.message || e) }; }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
-}
-
-// ---------- tes manual dari editor ----------
-// Tempel token dari app Absensi (DevTools → Application → Local Storage →
-// absensi_token), lalu Run. Jangan commit token asli ke repo.
-function testVerifikasiToken() {
-  const TOKEN_UJI = 'TEMPEL_TOKEN_DI_SINI';
-  if (TOKEN_UJI === 'TEMPEL_TOKEN_DI_SINI') { Logger.log('Isi dulu TOKEN_UJI.'); return; }
-  const p = readToken_(TOKEN_UJI);
-  if (!p) { Logger.log('GAGAL: token ditolak. Cek HR_TOKEN_SECRET sama dengan project Absensi, atau token sudah kadaluarsa.'); return; }
-  Logger.log('OK: ' + p.nama + ' (' + p.role + '), boleh akses: ' + (ALLOWED_ROLES.indexOf(String(p.role).toLowerCase()) !== -1));
 }

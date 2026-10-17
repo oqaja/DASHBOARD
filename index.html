@@ -10,37 +10,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<!-- style.css = salinan style.css app Absensi (hrKulturama/ABSENSI). web.css = tambahan khusus web app ini. -->
+<!-- style.css = tema pastel "Shoebox Tag" (asal dari app Absensi). web.css = tambahan khusus web app ini. -->
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="web.css">
 </head>
 <body class="web-dashboard">
 
-<!-- ===== LOGIN (nama + PIN Absensi) — logika di auth.js ===== -->
-<div class="app-gate" id="appGate">
-  <div class="app-gate-inner">
-    <div class="app-gate-brand">
-      <span class="emoji">📊</span>
-      <div class="title">Dashboard Konten</div>
-    </div>
-    <form class="card" id="loginForm" novalidate>
-      <p class="info-text" id="loginInfo">Masuk pakai nama & PIN Absensi kamu. Khusus tim Kreatif, HR, dan admin.</p>
-      <label class="web-label" for="loginNama">Nama</label>
-      <select id="loginNama" required><option value="">Memuat daftar nama…</option></select>
-      <input type="text" id="loginNamaText" placeholder="Tulis nama persis seperti di Absensi" autocomplete="username" hidden>
-      <label class="web-label" for="loginPin">PIN</label>
-      <input type="password" id="loginPin" placeholder="PIN 4 digit" inputmode="numeric" maxlength="4" autocomplete="current-password" required>
-      <div id="loginError" role="alert"></div>
-      <button class="btn" type="submit" id="loginBtn">Masuk</button>
-    </form>
-  </div>
-</div>
-
 <div class="app-shell">
-  <div class="web-userbar" id="userBar" hidden>
-    <span>Masuk sebagai <b id="userName">—</b></span>
-    <button type="button" class="web-logout" id="logoutBtn">Keluar</button>
-  </div>
 
 <div class="page active" id="page-dashboard">
   <div style="padding:0">
@@ -75,7 +51,17 @@
   <div class="dash-toast" id="dashToast" role="status" style="display:none"></div>
 </div>
 
+<script>
+  // URL Web App Apps Script backend dashboard ini (apps-script/dashboard-backend.gs).
+  // Terpisah dari backend app Absensi. Kosong = halaman nampilin "Backend belum dipasang".
+  window.DASHBOARD_CONFIG = {
+    apiUrl: ''
+  };
+</script>
 <script src="dashboard.js"></script>
-<script src="auth.js"></script>
+<script>
+  // Gak ada login: langsung tampilkan dashboard.
+  document.addEventListener('DOMContentLoaded', () => window.renderDashboard());
+</script>
 </body>
 </html>

@@ -1,33 +1,34 @@
 # Dashboard Konten
 
-Web app buat kontrol konten Shoe Police dari tab **KALENDER KONTEN** (DASHBOARD KULTURAMA V1):
-status upload YT/IG/TT per hari, beres/belum dari kolom PRODUCTION, plus detail & edit tiap konten.
+Web app mandiri buat kontrol konten Shoe Police dari tab **KALENDER KONTEN**
+(spreadsheet DASHBOARD KULTURAMA V1): status upload YT/IG/TT per hari, beres/belum dari
+kolom PRODUCTION, plus detail & edit tiap konten.
 
-Ini salinan berdiri sendiri dari tab **Dashboard** di app Absensi (`hrKulturama/ABSENSI`).
+- **Terpisah dari app Absensi**: gak pakai login Absensi, gak nyambung ke backend Absensi.
+- **Data tersinkron lewat sheet**: baca & tulis langsung ke KALENDER KONTEN, jadi perubahan
+  di sheet, di web app ini, dan di tab Dashboard app Absensi semuanya ketemu di data yang sama.
+  Web app narik ulang data tiap 3 menit (atau tap ↻).
+- **Tanpa login**: siapa pun yang punya link bisa lihat & edit. Jangan sebar link-nya ke luar tim.
 
 ## Isi repo
 
 | File | Isi |
 |---|---|
-| `index.html` | Halaman login + dashboard |
-| `auth.js` | Login pakai nama + PIN Absensi (khusus role kreatif / hr / admin) |
-| `dashboard.js` | Logika dashboard — **salinan persis** `dashboard.js` di repo ABSENSI |
-| `style.css` | Salinan `style.css` app Absensi (tema pastel "Shoebox Tag") |
-| `web.css` | Tambahan khusus web app ini (bar user, form login) |
-| `apps-script/kontrol-upload.gs` | Kode backend Apps Script "Kontrol Dashboard" (sama dengan di repo ABSENSI) |
+| `index.html` | Halaman dashboard + `DASHBOARD_CONFIG.apiUrl` (alamat backend) |
+| `dashboard.js` | Logika dashboard (list, ringkasan, detail, edit) |
+| `style.css` | Tema pastel "Shoebox Tag" (asal dari app Absensi) |
+| `web.css` | Tambahan khusus web app ini |
+| `apps-script/dashboard-backend.gs` | Kode backend Apps Script (project sendiri) |
 
-## Backend
+## Pasang backend
 
-- **Data**: Apps Script "Kontrol Dashboard" — URL-nya di `KONTROL_API_URL` (`dashboard.js`).
-  Satu backend dipakai bareng app Absensi dan web app ini. Kolom dibaca lewat **nama header**,
-  jadi kolom sheet boleh ditambah/dihapus/dipindah asal nama header-nya gak diganti.
-- **Login**: backend Absensi (`action: 'login'`), URL-nya di `ABSENSI_SCRIPT_URL` (`auth.js`).
-  Token yang dihasilkan diverifikasi Kontrol Dashboard pakai `HR_TOKEN_SECRET` yang sama.
+1. script.google.com → **New project** (pakai akun Google yang bisa **edit** spreadsheet
+   DASHBOARD KULTURAMA V1) → tempel `apps-script/dashboard-backend.gs` → **Save**.
+2. **Deploy → New deployment → Web app**, Execute as **Me**, Who has access **Anyone** → Deploy.
+3. Copy URL `/exec` → isi `apiUrl` di `DASHBOARD_CONFIG` (`index.html`).
 
-Update kode backend: tempel `apps-script/kontrol-upload.gs` ke project Apps Script, **Save**, lalu
-**Deploy → Manage deployments → ✏️ → Version: New version → Deploy** (URL tetap sama).
+Update kode backend: tempel versi baru → **Save** → **Deploy → Manage deployments → ✏️ →
+Version: New version → Deploy** (URL tetap sama).
 
-## Sinkron dengan app Absensi
-
-`dashboard.js` dan `style.css` di sini disalin dari repo ABSENSI. Kalau salah satu diubah,
-salin juga ke repo satunya biar dua-duanya tetap sama.
+Kolom sheet dibaca lewat **nama header** (TANGGAL, JUDUL KONTEN, CATATAN, dst.), jadi kolom
+boleh ditambah/dihapus/dipindah asal nama header-nya gak diganti.
