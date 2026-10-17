@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Dashboard Konten</title>
 <meta name="theme-color" content="#4FAE87">
 <link rel="icon" href="icon-192.png">
@@ -19,7 +19,8 @@
 <div class="app-shell">
 
 <div class="page active" id="page-dashboard">
-  <div style="padding:0">
+  <div class="web-layout">
+   <aside class="web-side" aria-label="Ringkasan & filter">
     <div class="home-header">
       <div>
         <div class="home-eyebrow">Kontrol Upload</div>
@@ -38,12 +39,15 @@
     </div>
 
     <div class="dash-summary" id="dashSummary"></div>
+   </aside>
 
+   <main class="web-main">
     <div class="dash-listhead">
       <div class="section-label" id="dashListTitle">Konten</div>
       <label class="dash-toggle" for="dashOnlyProblem"><input type="checkbox" id="dashOnlyProblem"> Belum beres aja</label>
     </div>
     <div id="dashRows"></div>
+   </main>
   </div>
 </div>
 
