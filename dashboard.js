@@ -29,6 +29,7 @@
   const state = {
     rows: [], date: todayJkt(), jenis: 'Semua', akun: 'Semua', onlyProblem: false,
     loadedAt: null, loading: false, error: null, saving: new Set(), win: null, options: {}, fields: null, backendOld: false,
+    rawRows: [], fromCache: false, offline: false,
   };
 
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -40,6 +41,31 @@
     state.onlyProblem = !!s.onlyProblem;
   } catch (e) {}
   function savePrefs() { lsSet('dashboard_prefs', JSON.stringify({ jenis: state.jenis, akun: state.akun, onlyProblem: state.onlyProblem })); }
+
+  // Cache data terakhir di browser: dashboard langsung tampil saat dibuka (tanpa nunggu
+  // Apps Script), lalu data segar ditarik di belakang.
+  const CACHE_KEY = 'dashboard_cache_v2';
+  function saveCache() {
+    if (!state.loadedAt || state.fromCache) return;
+    lsSet(CACHE_KEY, JSON.stringify({ rows: state.rawRows, win: state.win, options: state.options, fields: state.fields, savedAt: state.loadedAt.toISOString() }));
+  }
+  function restoreCache() {
+    try {
+      const c = JSON.parse(lsGet(CACHE_KEY) || 'null');
+      if (!c || !Array.isArray(c.rows) || !c.win) return;
+      state.rawRows = c.rows; state.rows = c.rows.map(toRecord); state.win = c.win;
+      state.options = c.options || {}; state.fields = c.fields || null;
+      state.loadedAt = new Date(c.savedAt); state.fromCache = true;
+    } catch (e) {}
+  }
+  // Pelanggan perubahan data (halaman Tugas Saya, dsb.).
+  const listeners = [];
+  function emit() { listeners.forEach(fn => { try { fn(); } catch (e) { console.error(e); } }); }
+  // Simpan versi mentah tiap baris (buat cache) di samping record yang sudah diolah.
+  function putRaw(raw) {
+    const i = state.rawRows.findIndex(r => r.row === raw.row);
+    if (i === -1) state.rawRows.push(raw); else state.rawRows[i] = raw;
+  }
 
   // Tanpa login: backend gak minta token, semua yang buka web app boleh lihat & edit.
   const tokenNow = () => 'public';
@@ -265,8 +291,12 @@
 
   function renderSync() {
     const l = $('dashSync');
-    if (state.loading) l.textContent = 'Sinkron dengan KALENDER KONTEN…';
-    else if (state.loadedAt) l.textContent = 'Live dari KALENDER KONTEN · update ' + new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }).format(state.loadedAt) + ' WIB';
+    if (state.loading && state.loadedAt) l.textContent = 'Sinkron dengan KALENDER KONTEN…';
+    else if (state.loading) l.textContent = 'Memuat dari KALENDER KONTEN…';
+    else if (state.loadedAt) {
+      const jam = new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }).format(state.loadedAt);
+      l.textContent = (state.offline ? 'Offline · data tersimpan ' : state.fromCache ? 'Data tersimpan · ' : 'Live dari KALENDER KONTEN · update ') + jam + ' WIB';
+    }
     else l.textContent = state.error ? 'Gagal sinkron' : 'Memuat…';
     $('dashRefresh').disabled = state.loading;
   }
@@ -324,7 +354,7 @@
     const win = { from: shiftDate(today, -FETCH_BACK), to: shiftDate(today, FETCH_AHEAD) };
     try {
       const data = await api('GET', { action: 'list', from: win.from, to: win.to });
-      state.rows = data.rows.map(toRecord); state.win = win;
+      state.rawRows = data.rows.slice(); state.rows = data.rows.map(toRecord); state.win = win; state.fromCache = false; state.offline = false;
       if (data.options) state.options = data.options;
       if (Array.isArray(data.fields)) { state.fields = data.fields; state.backendOld = false; }
       else if (!state.backendOld) {
@@ -333,12 +363,14 @@
         toast('Backend Apps Script masih versi lama. Detail belum lengkap & edit belum bisa sampai di-deploy ulang.', true);
       }
       state.loadedAt = new Date(); state.error = null;
+      saveCache();
       if (manual) toast('Data terbaru udah ditarik.');
     } catch (err) {
       if (err.code === 'UNAUTHORIZED') { state.loading = false; sesiHabisDariSini(); return; }
       state.error = explain(err);
-      if (state.loadedAt) toast(state.error.title + '. ' + state.error.body, true);
-    } finally { state.loading = false; if (isPageActive()) render(); if (detail.rowNum != null && !detail.editing) renderSheet(); }
+      if (err.code === 'NETWORK' && state.loadedAt) { state.offline = true; if (manual) toast('Lagi offline. Yang tampil data tersimpan terakhir.', true); }
+      else if (state.loadedAt) toast(state.error.title + '. ' + state.error.body, true);
+    } finally { state.loading = false; if (isPageActive()) render(); if (detail.rowNum != null && !detail.editing) renderSheet(); emit(); }
   }
 
   async function saveStatus(rec, plat, value, sel) {
@@ -347,6 +379,10 @@
     try {
       await api('POST', { action: 'setStatus', row: rec.rowNum, platform: plat, value: value, title: rec.title, date: rec.date });
       rec.plat[plat].status = value;
+      const raw = state.rawRows.find(r => r.row === rec.rowNum);
+      if (raw) { raw['status' + plat] = value; if (raw.f) raw.f['status' + plat] = value; }
+      rec.f['status' + plat] = value;
+      saveCache(); emit();
       toast(`${plat} “${rec.title.length > 36 ? rec.title.slice(0, 36) + '…' : rec.title}” → ${value || 'kosong'}`);
     } catch (err) {
       rec.plat[plat].status = prev;
@@ -395,9 +431,12 @@
   const GROUPS = ['Konten', 'Jadwal', 'Tim', 'Status upload', 'Post ID', 'Brand', 'Catatan', 'Lainnya'];
   // Field yang kolomnya udah dihapus dari sheet otomatis gak ditampilin.
   const activeFields = () => FIELDS.filter(f => !state.fields || f.k === 'tanggal' || state.fields.includes(f.k));
-  const detail = { rowNum: null, editing: false, saving: false };
+  const detail = { rowNum: null, editing: false, saving: false, adding: false, blank: null, nonce: '' };
+  // Field yang gak muncul di form TAMBAH (diisi script upload / Calendar Sync).
+  const ADD_SKIP = ['eventId', 'postYT', 'postIG', 'postTT', 'postFB'];
+  const formFields = () => activeFields().filter(f => !detail.adding || !ADD_SKIP.includes(f.k));
 
-  const findRec = (rowNum) => state.rows.find(r => r.rowNum === rowNum);
+  const findRec = (rowNum) => (detail.adding ? detail.blank : state.rows.find(r => r.rowNum === rowNum));
   const cellOf = (rec, k) => (k === 'tanggal' ? rec.date : String(rec.f[k] == null ? '' : rec.f[k]).trim());
   const optFor = (k) => state.options[k] || null;
   const splitMulti = (v) => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
@@ -428,14 +467,33 @@
     if (detail.saving) return;
     const wrap = $('dashSheetWrap'); if (wrap) wrap.style.display = 'none';
     document.body.classList.remove('dash-sheet-open');
-    detail.rowNum = null; detail.editing = false;
+    detail.rowNum = null; detail.editing = false; detail.adding = false; detail.blank = null;
+  }
+
+  // Form konten baru. Tanggal, akun, dan jenis diisi dari tanggal/filter yang lagi dipilih.
+  function openAdd(date) {
+    if (state.backendOld) { toast('Backend Apps Script masih versi lama. Deploy ulang dulu sebelum bisa tambah konten.', true); return; }
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date : state.date;
+    const f = {};
+    if (state.akun !== 'Semua') f.akun = state.akun;
+    if (state.jenis !== 'Semua') f.jenis = state.jenis;
+    detail.blank = { rowNum: null, date: d, title: '', akun: f.akun || '', jenis: f.jenis || '', f: f,
+      plat: { YT: { jam: null, status: '' }, IG: { jam: null, status: '' }, TT: { jam: null, status: '' } } };
+    detail.adding = true; detail.editing = false; detail.rowNum = null;
+    detail.nonce = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const wrap = ensureSheet();
+    wrap.style.display = 'flex';
+    document.body.classList.add('dash-sheet-open');
+    renderSheet();
+    const sh = $('dashSheet'); sh.scrollTop = 0;
+    setTimeout(() => { const t = $('dashF_judul'); if (t) t.focus(); }, 0);
   }
 
   function sheetHeader(rec, title) {
     const h = el('div', 'dash-sheet-head');
     const t = el('div', 'dash-sheet-titles');
     t.appendChild(el('div', 'home-eyebrow', title));
-    const ttl = el('div', 'dash-sheet-title', rec.title || '(tanpa judul)'); ttl.id = 'dashSheetTitle';
+    const ttl = el('div', 'dash-sheet-title', detail.adding ? 'Konten baru' : (rec.title || '(tanpa judul)')); ttl.id = 'dashSheetTitle';
     t.appendChild(ttl);
     h.appendChild(t);
     const x = el('button', 'dash-sheet-close', '✕'); x.type = 'button'; x.setAttribute('aria-label', 'Tutup');
@@ -454,7 +512,7 @@
     const rec = findRec(detail.rowNum);
     sh.innerHTML = '';
     if (!rec) { sh.appendChild(el('div', 'loading-text', 'Konten ini udah nggak ada di data terbaru.')); return; }
-    if (detail.editing) return renderEdit(sh, rec);
+    if (detail.editing || detail.adding) return renderEdit(sh, rec);
 
     sh.appendChild(sheetHeader(rec, 'Detail konten'));
     const tags = el('div', 'dash-tags dash-sheet-tags');
@@ -546,12 +604,14 @@
   }
 
   function renderEdit(sh, rec) {
-    sh.appendChild(sheetHeader(rec, 'Edit konten'));
-    sh.appendChild(el('p', 'dash-sheet-hint', 'Perubahan langsung ketulis ke KALENDER KONTEN setelah kamu tap Simpan.'));
+    sh.appendChild(sheetHeader(rec, detail.adding ? 'Tambah konten' : 'Edit konten'));
+    sh.appendChild(el('p', 'dash-sheet-hint', detail.adding
+      ? 'Konten ditambahkan di baris paling bawah KALENDER KONTEN. Judul dan tanggal wajib diisi. Post ID & Event ID diisi otomatis oleh script.'
+      : 'Perubahan langsung ketulis ke KALENDER KONTEN setelah kamu tap Simpan.'));
     const form = el('form', 'dash-form');
     form.noValidate = true;
     GROUPS.forEach(g => {
-      const fs = activeFields().filter(f => f.group === g);
+      const fs = formFields().filter(f => f.group === g);
       if (!fs.length) return;
       const box = el('div', 'dash-sec');
       box.setAttribute('role', 'group'); box.setAttribute('aria-label', g);
@@ -565,8 +625,8 @@
     form.appendChild(err);
     const act = el('div', 'dash-sheet-actions two');
     const cancel = el('button', 'btn btn-secondary', 'Batal'); cancel.type = 'button';
-    cancel.onclick = () => { if (detail.saving) return; detail.editing = false; renderSheet(); };
-    const save = el('button', 'btn', 'Simpan'); save.type = 'submit'; save.id = 'dashSaveBtn';
+    cancel.onclick = () => { if (detail.saving) return; if (detail.adding) { closeDetail(); return; } detail.editing = false; renderSheet(); };
+    const save = el('button', 'btn', detail.adding ? 'Tambah' : 'Simpan'); save.type = 'submit'; save.id = 'dashSaveBtn';
     act.appendChild(cancel); act.appendChild(save);
     form.appendChild(act);
     form.onsubmit = (e) => { e.preventDefault(); saveDetail(rec); };
@@ -575,6 +635,7 @@
 
   async function saveDetail(rec) {
     if (detail.saving) return;
+    if (detail.adding) return saveNew();
     const errBox = $('dashFormErr'); errBox.textContent = '';
     const changes = {};
     activeFields().forEach(f => {
@@ -590,6 +651,7 @@
     const btn = $('dashSaveBtn'); btn.disabled = true; btn.textContent = 'Menyimpan…';
     try {
       const data = await api('POST', { action: 'updateRow', row: rec.rowNum, title: rec.title, date: rec.date, changes });
+      putRaw(data.row);
       const fresh = toRecord(data.row);
       const idx = state.rows.findIndex(r => r.rowNum === rec.rowNum);
       if (idx !== -1) state.rows[idx] = fresh; else state.rows.push(fresh);
@@ -598,6 +660,7 @@
         const d = fmtDay(fresh.date);
         toast(`Tersimpan. Konten pindah ke ${d.hari}, ${d.tgl} ${d.bln}.`);
       } else toast('Tersimpan ke KALENDER KONTEN.');
+      saveCache(); emit();
       render(); renderSheet();
     } catch (err) {
       detail.saving = false;
@@ -609,6 +672,48 @@
     }
   }
 
+  async function saveNew() {
+    const errBox = $('dashFormErr'); errBox.textContent = '';
+    const data = {};
+    formFields().forEach(f => {
+      if (f.type === 'readonly') return;
+      const v = readControl(f); if (v) data[f.k] = v;
+    });
+    if (!data.judul) { errBox.textContent = 'Judul konten wajib diisi.'; return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.tanggal || '')) { errBox.textContent = 'Tanggal wajib diisi.'; return; }
+    detail.saving = true;
+    const btn = $('dashSaveBtn'); btn.disabled = true; btn.textContent = 'Menambahkan…';
+    try {
+      const res = await api('POST', { action: 'addRow', data, nonce: detail.nonce });
+      putRaw(res.row);
+      const fresh = toRecord(res.row);
+      const idx = state.rows.findIndex(r => r.rowNum === fresh.rowNum);
+      if (idx !== -1) state.rows[idx] = fresh; else state.rows.push(fresh);
+      detail.saving = false; detail.adding = false; detail.blank = null; detail.rowNum = fresh.rowNum;
+      if (inWindow(fresh.date)) state.date = fresh.date;
+      const d = fmtDay(fresh.date);
+      toast(`Konten baru tersimpan di ${d.hari}, ${d.tgl} ${d.bln} (baris ${fresh.rowNum}).`);
+      saveCache(); emit();
+      render(); renderSheet(); $('dashSheet').scrollTop = 0;
+    } catch (err) {
+      detail.saving = false;
+      if (/action tidak dikenal/i.test(err.message || '')) errBox.textContent = 'Backend Apps Script belum di-deploy versi baru, jadi belum bisa tambah konten. Lihat README langkah "Update kode backend".';
+      else if (err.code === 'NETWORK') errBox.textContent = 'Koneksi putus. Tap Tambah lagi — kalau ternyata sudah masuk, gak bakal dobel.';
+      else errBox.textContent = 'Gagal menambahkan: ' + (err.message || 'error');
+      btn.disabled = false; btn.textContent = 'Tambah';
+    }
+  }
+
+  // ---------- dipakai halaman lain (pages.js) ----------
+  window.KontenApp = {
+    api, toast, toRecord, rowHealth, platHealth, isLate, fmtDay, todayJkt, shiftDate, parseJam,
+    openDetail, openAdd, load,
+    rows: () => state.rows, options: () => state.options, loadedAt: () => state.loadedAt,
+    loading: () => state.loading, error: () => state.error,
+    onData(fn) { listeners.push(fn); },
+    JENIS_CLS, HEALTH_LABEL, PLATS, BULAN, HARI,
+  };
+
   // ---------- hook ke app.js ----------
   // Dipanggil dari goPage('dashboard').
   window.renderDashboard = function () {
@@ -616,7 +721,7 @@
     state.date = state.date || todayJkt();
     const w = $('dashWeek'); if (w) delete w.dataset.scrolled;
     render();
-    if (!state.loadedAt || Date.now() - state.loadedAt.getTime() > STALE_MS) load(false);
+    if (!state.loadedAt || state.fromCache || Date.now() - state.loadedAt.getTime() > STALE_MS) load(false);
   };
 
   // Dipanggil dari terapkanRoleKeUI() tiap kali sesi/role berubah.
@@ -630,22 +735,19 @@
     }
   };
 
+  restoreCache();
+
   document.addEventListener('DOMContentLoaded', () => {
     if (!$('page-dashboard')) return;
     $('dashRefresh').onclick = () => load(true);
+    const add = $('dashAddBtn'); if (add) add.onclick = () => openAdd(state.date);
     $('dashOnlyProblem').onchange = (e) => { state.onlyProblem = e.target.checked; savePrefs(); render(); };
     window.updateDashboardNav();
-    // Link langsung: index.html#dashboard (dipakai kontrol.html lama).
-    if (location.hash === '#dashboard') {
-      setTimeout(() => {
-        if (tokenNow() && ROLE_BOLEH.includes(roleNow()) && typeof window.goPage === 'function') window.goPage('dashboard');
-      }, 0);
-    }
   });
 
   // Refresh otomatis tiap 3 menit, cuma kalau tab Dashboard lagi dibuka.
   setInterval(() => {
-    if (document.visibilityState === 'visible' && isPageActive() && !state.saving.size) load(false);
+    if (document.visibilityState === 'visible' && !state.saving.size && !detail.saving) load(false);
   }, 3 * 60 * 1000);
   // Hitung ulang tanda TELAT tiap menit.
   setInterval(() => { if (isPageActive() && state.loadedAt) render(); }, 60 * 1000);

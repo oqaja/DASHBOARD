@@ -4,10 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Dashboard Konten</title>
+<meta name="description" content="Kontrol konten Shoe Police dari KALENDER KONTEN (Dashboard Kulturama).">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#191919" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <!-- Tema minimalis ala Notion (terang + gelap otomatis), semua ukuran layar. -->
 <link rel="stylesheet" href="app.css">
 </head>
@@ -15,13 +21,22 @@
 
 <div class="app-shell">
 
+<!-- Navigasi antar halaman (diisi pages.js) -->
+<nav class="app-nav" id="appNav" aria-label="Halaman">
+  <div class="app-nav-brand">Dashboard Konten</div>
+  <div class="app-nav-links" id="appNavLinks"></div>
+  <button type="button" class="app-install" id="appInstall" hidden>Install app</button>
+</nav>
+<div class="app-offline" id="appOffline" hidden>Lagi offline. Yang tampil data tersimpan terakhir; perubahan belum bisa disimpan.</div>
+
+<!-- 1. Upload Harian -->
 <div class="page active" id="page-dashboard">
   <div class="web-layout">
    <aside class="web-side" aria-label="Ringkasan & filter">
     <div class="home-header">
       <div>
         <div class="home-eyebrow">Kontrol Upload</div>
-        <div class="home-title">Dashboard Konten</div>
+        <div class="home-title">Upload Harian</div>
       </div>
       <button type="button" class="badge-circle dash-refresh" id="dashRefresh" title="Tarik data terbaru" aria-label="Tarik data terbaru">↻</button>
     </div>
@@ -41,7 +56,10 @@
    <main class="web-main">
     <div class="dash-listhead">
       <div class="section-label" id="dashListTitle">Konten</div>
-      <label class="dash-toggle" for="dashOnlyProblem"><input type="checkbox" id="dashOnlyProblem"> Belum beres aja</label>
+      <div class="dash-listhead-act">
+        <label class="dash-toggle" for="dashOnlyProblem"><input type="checkbox" id="dashOnlyProblem"> Belum beres aja</label>
+        <button type="button" class="btn btn-sm" id="dashAddBtn">+ Tambah konten</button>
+      </div>
     </div>
     <div class="dash-table-head" aria-hidden="true">
       <span>Konten</span><span>Akun · Jenis</span><span>Tim</span><span>YouTube</span><span>Instagram</span><span>TikTok</span><span>Status</span>
@@ -51,6 +69,11 @@
   </div>
 </div>
 
+<!-- 2–5. Halaman lain (diisi pages.js) -->
+<div class="page" id="page-tugas"><div class="pg" id="pgTugas"></div></div>
+<div class="page" id="page-overview"><div class="pg" id="pgOverview"></div></div>
+<div class="page" id="page-log"><div class="pg pg-wide" id="pgLog"></div></div>
+<div class="page" id="page-brand"><div class="pg pg-wide" id="pgBrand"></div></div>
 
   <div class="dash-toast" id="dashToast" role="status" style="display:none"></div>
 </div>
@@ -63,9 +86,14 @@
   };
 </script>
 <script src="dashboard.js"></script>
+<script src="pages.js"></script>
 <script>
-  // Gak ada login: langsung tampilkan dashboard.
-  document.addEventListener('DOMContentLoaded', () => window.renderDashboard());
+  // Gak ada login: langsung tampilkan dashboard. Halaman dipilih lewat hash (#/upload, #/tugas, ...).
+  document.addEventListener('DOMContentLoaded', () => window.startPages());
+  // PWA: service worker buat cache tampilan (data tetap diambil langsung dari Apps Script).
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
 </script>
 </body>
 </html>

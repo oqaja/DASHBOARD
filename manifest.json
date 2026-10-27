@@ -1,0 +1,22 @@
+{
+  "name": "Dashboard Konten Kulturama",
+  "short_name": "Dashboard",
+  "description": "Kontrol konten Shoe Police dari KALENDER KONTEN (Dashboard Kulturama).",
+  "lang": "id",
+  "start_url": "./#/upload",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Upload Harian", "url": "./#/upload" },
+    { "name": "Tugas Saya", "url": "./#/tugas" },
+    { "name": "Tambah konten", "url": "./#/upload?tambah=1" }
+  ]
+}
