@@ -278,7 +278,9 @@
 
     // Target REPORT PRODUKSI
     root.appendChild(el('h2', 'pg-h2', 'Target bulanan'));
-    const pm = (ov.produksi || []).find((x) => x.month === ov.month);
+    // Blok bulan yang angkanya belum diisi dianggap belum ada.
+    const pmRaw = (ov.produksi || []).find((x) => x.month === ov.month);
+    const pm = pmRaw && pmRaw.rows.some((r) => r.selesai != null || r.target != null) ? pmRaw : null;
     if (pm) {
       root.appendChild(table([
         { t: 'Konten', k: (r) => r.konten },
@@ -398,7 +400,7 @@
     if (lg.sort !== 'baru') rows.sort((a, b) => (b[lg.sort] || 0) - (a[lg.sort] || 0));
     if (!rows.length) { root.appendChild(el('div', 'coming-soon-card', 'Gak ada postingan yang cocok dengan filter ini.')); return; }
     root.appendChild(table([
-      { t: 'Tanggal', k: (r) => (r.date ? dayLabel(r.date) + (r.time ? ' · ' + r.time : '') : '—'), cls: 'nowrap' },
+      { t: 'Tanggal', k: (r) => (r.date ? dayLabel(r.date) + (r.time ? ' · ' + r.time : '') + (r.dateFromKalender ? ' *' : '') : '—'), cls: 'nowrap' },
       { t: 'Judul', k: (r) => (r.link ? link(r.title, r.link) : r.title), cls: 'grow' },
       { t: 'Platform', k: (r) => r.platform },
       { t: 'Akun', k: (r) => r.akun },
@@ -409,6 +411,7 @@
       { t: 'Share', k: (r) => fmtNum(r.shares), cls: 'num' },
       { t: 'Brand', k: (r) => r.brand },
     ], rows, { cls: 'tbl-log' }));
+    if (rows.some((r) => r.dateFromKalender)) root.appendChild(el('div', 'pg-note', '* Tanggal diambil dari KALENDER KONTEN / KALENDER AFFILIATE lewat Post ID, karena kolom Tanggal Upload di INSIGHT kosong.'));
     if (res.truncated) root.appendChild(el('div', 'pg-note', `Ditampilkan ${nf.format(rows.length)} dari ${nf.format(res.matched)} postingan. Persempit tanggal atau pakai pencarian. Total di atas tetap dihitung dari semua.`));
   }
 

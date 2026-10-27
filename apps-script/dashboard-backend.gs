@@ -25,7 +25,7 @@
  *    (URL tetap sama).
  */
 
-const VERSION = 2; // naikkan tiap ada action baru; dashboard.js ngecek lewat ?action=ping
+const VERSION = 3; // naikkan tiap ada action baru; dashboard.js ngecek lewat ?action=ping
 const SPREADSHEET_ID = '1raiIO1HccW7IxN9bh9BqUJ7DOHDVBN05GKRQ5xrrfeI';
 const TAB = 'KALENDER KONTEN';
 // Tab lain yang cuma DIBACA (halaman Log Post, Brand, Overview). Gak ada yang ditulis ke sini.
@@ -305,11 +305,37 @@ function insight_(p) {
   const n = sh.getLastRow(), w = sh.getLastColumn();
   if (n < 2) return { ok: true, rows: [], total: emptyTotal_(), matched: 0, truncated: false };
   const rng = sh.getRange(1, 1, n, w);
-  return insightFilter_(rng.getValues(), rng.getDisplayValues(), p);
+  return insightFilter_(rng.getValues(), rng.getDisplayValues(), p, postDates_());
+}
+
+// Kolom "Tanggal Upload" di INSIGHT sering kosong. Cadangannya: tanggal konten di
+// KALENDER KONTEN / KALENDER AFFILIATE yang POST ID-nya sama. { postId: 'YYYY-MM-DD' }
+const TAB_AFFILIATE = 'KALENDER AFFILIATE';
+function postDates_() {
+  const out = {};
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  [TAB, TAB_AFFILIATE].forEach(function (name) {
+    const sh = ss.getSheetByName(name);
+    if (!sh || sh.getLastRow() < 2) return;
+    const w = sh.getLastColumn();
+    const head = sh.getRange(1, 1, 1, w).getDisplayValues()[0].map(function (h) { return String(h).trim().toUpperCase(); });
+    const iT = head.indexOf('TANGGAL');
+    const ids = ['POST ID YT', 'POST ID IG', 'POST ID TT', 'POST ID FB'].map(function (h) { return head.indexOf(h); }).filter(function (i) { return i !== -1; });
+    if (iT === -1 || !ids.length) return;
+    const rng = sh.getRange(2, 1, sh.getLastRow() - 1, w);
+    const raw = rng.getValues(), disp = rng.getDisplayValues();
+    for (let i = 0; i < raw.length; i++) {
+      const d = cellDate_(raw[i][iT], disp[i][iT]);
+      if (!d) continue;
+      ids.forEach(function (j) { const id = String(disp[i][j]).trim(); if (id && !out[id]) out[id] = d; });
+    }
+  });
+  return out;
 }
 
 // Dipisah dari insight_ biar bisa dites tanpa SpreadsheetApp.
-function insightFilter_(raw, disp, p) {
+function insightFilter_(raw, disp, p, postDates) {
+  postDates = postDates || {};
   const head = disp[0].map(function (h) { return String(h).trim().toUpperCase(); });
   const col = {};
   Object.keys(INSIGHT_COLS).forEach(function (k) { const i = head.indexOf(INSIGHT_COLS[k]); if (i !== -1) col[k] = i; });
@@ -324,7 +350,8 @@ function insightFilter_(raw, disp, p) {
     const title = String(d[col.judul] || '').trim();
     if (!title) continue;
     const g = function (k) { return col[k] == null ? '' : String(d[col[k]]).trim(); };
-    const date = col.tanggal == null ? null : cellDateTime_(raw[i][col.tanggal], d[col.tanggal]);
+    let date = col.tanggal == null ? null : cellDateTime_(raw[i][col.tanggal], d[col.tanggal]);
+    if (!date && g('postId') && postDates[g('postId')]) date = { date: postDates[g('postId')], time: '', fromKalender: true };
     if ((from || to) && (!date || (from && date.date < from) || (to && date.date > to))) continue;
     if (plat && g('platform') !== plat) continue;
     if (akun && g('akun') !== akun) continue;
@@ -332,11 +359,16 @@ function insightFilter_(raw, disp, p) {
     if (q && (title + ' ' + g('brand') + ' ' + g('postId')).toLowerCase().indexOf(q) === -1) continue;
     const r = { line: i + 1, date: date ? date.date : '', time: date ? date.time : '', title: title,
       jenis: g('jenis'), platform: g('platform'), akun: g('akun'), link: g('link'), postId: g('postId'),
-      brand: g('brand'), updated: g('updated') };
+      brand: g('brand'), updated: g('updated'), dateFromKalender: !!(date && date.fromKalender) };
     INSIGHT_NUM.forEach(function (k) { r[k] = num_(g(k)); if (r[k] != null) total[k] += r[k]; });
     hits.push(r);
   }
-  hits.sort(function (a, b) { return (b.date + b.time).localeCompare(a.date + a.time); });
+  // Terbaru dulu; yang tanpa tanggal ditaruh paling bawah sesuai urutan sheet (atas = terbaru).
+  hits.sort(function (a, b) {
+    if (a.date && b.date) return (b.date + b.time).localeCompare(a.date + a.time) || a.line - b.line;
+    if (a.date || b.date) return a.date ? -1 : 1;
+    return a.line - b.line;
+  });
   return { ok: true, rows: hits.slice(0, INSIGHT_LIMIT), total: total, matched: hits.length, truncated: hits.length > INSIGHT_LIMIT };
 }
 function emptyTotal_() { const t = {}; INSIGHT_NUM.forEach(function (k) { t[k] = 0; }); return t; }
