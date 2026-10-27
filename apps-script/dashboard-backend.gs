@@ -25,7 +25,7 @@
  *    (URL tetap sama).
  */
 
-const VERSION = 3; // naikkan tiap ada action baru; dashboard.js ngecek lewat ?action=ping
+const VERSION = 4; // naikkan tiap ada action baru; dashboard.js ngecek lewat ?action=ping
 const SPREADSHEET_ID = '1raiIO1HccW7IxN9bh9BqUJ7DOHDVBN05GKRQ5xrrfeI';
 const TAB = 'KALENDER KONTEN';
 // Tab lain yang cuma DIBACA (halaman Log Post, Brand, Overview). Gak ada yang ditulis ke sini.
@@ -304,32 +304,43 @@ function insight_(p) {
   if (!sh) throw err_('SETUP', 'Tab ' + TAB_INSIGHT + ' tidak ditemukan');
   const n = sh.getLastRow(), w = sh.getLastColumn();
   if (n < 2) return { ok: true, rows: [], total: emptyTotal_(), matched: 0, truncated: false };
-  const rng = sh.getRange(1, 1, n, w);
-  return insightFilter_(rng.getValues(), rng.getDisplayValues(), p, postDates_());
+  // Cukup teks tampilannya (sekali baca); tanggal "26/10/2026 16:51" diurai dari teks.
+  const disp = sh.getRange(1, 1, n, w).getDisplayValues();
+  return insightFilter_(disp, disp, p, postDates_());
 }
 
 // Kolom "Tanggal Upload" di INSIGHT sering kosong. Cadangannya: tanggal konten di
 // KALENDER KONTEN / KALENDER AFFILIATE yang POST ID-nya sama. { postId: 'YYYY-MM-DD' }
 const TAB_AFFILIATE = 'KALENDER AFFILIATE';
+// Disimpan di cache 10 menit biar Log Post gak baca ulang dua tab kalender tiap kali dibuka.
 function postDates_() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get('postDates_v1');
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
   const out = {};
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   [TAB, TAB_AFFILIATE].forEach(function (name) {
     const sh = ss.getSheetByName(name);
     if (!sh || sh.getLastRow() < 2) return;
-    const w = sh.getLastColumn();
+    const n = sh.getLastRow() - 1, w = sh.getLastColumn();
     const head = sh.getRange(1, 1, 1, w).getDisplayValues()[0].map(function (h) { return String(h).trim().toUpperCase(); });
     const iT = head.indexOf('TANGGAL');
     const ids = ['POST ID YT', 'POST ID IG', 'POST ID TT', 'POST ID FB'].map(function (h) { return head.indexOf(h); }).filter(function (i) { return i !== -1; });
     if (iT === -1 || !ids.length) return;
-    const rng = sh.getRange(2, 1, sh.getLastRow() - 1, w);
-    const raw = rng.getValues(), disp = rng.getDisplayValues();
-    for (let i = 0; i < raw.length; i++) {
-      const d = cellDate_(raw[i][iT], disp[i][iT]);
-      if (!d) continue;
-      ids.forEach(function (j) { const id = String(disp[i][j]).trim(); if (id && !out[id]) out[id] = d; });
-    }
+    // Baca kolom yang perlu saja (tanggal + post ID), bukan seluruh tab.
+    const tgl = sh.getRange(2, iT + 1, n, 1).getDisplayValues();
+    ids.forEach(function (j) {
+      const col = sh.getRange(2, j + 1, n, 1).getDisplayValues();
+      for (let i = 0; i < n; i++) {
+        const id = String(col[i][0]).trim();
+        if (!id || out[id]) continue;
+        const d = cellDate_(null, tgl[i][0]);
+        if (d) out[id] = d;
+      }
+    });
   });
+  const s = JSON.stringify(out);
+  if (s.length < 95000) cache.put('postDates_v1', s, 600);
   return out;
 }
 
